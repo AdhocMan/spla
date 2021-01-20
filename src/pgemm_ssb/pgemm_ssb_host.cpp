@@ -51,6 +51,8 @@
 
 namespace spla {
 
+bool useRingReduceGlobal = false;
+
 template <typename T>
 void pgemm_ssb_host(int m, int n, int kLocal, SplaOperation opA, T alpha,
                     const T *A, int lda, const T *B, int ldb, T beta, T *C,
@@ -84,11 +86,12 @@ void pgemm_ssb_host(int m, int n, int kLocal, SplaOperation opA, T alpha,
 
     // Use ring reduce if block size is at least a given size and most ranks
     // hold result blocks
-    if (descC.row_block_size() * descC.col_block_size() >= 256 * 256 &&
-        descC.comm().size() >
-            (descC.proc_grid_rows() * descC.proc_grid_cols()) / 2) {
-      useRingReduce = true;
-    }
+    // if (descC.row_block_size() * descC.col_block_size() >= 256 * 256 &&
+    //     descC.comm().size() >
+    //         (descC.proc_grid_rows() * descC.proc_grid_cols()) / 2) {
+    //   useRingReduce = true;
+    // }
+      useRingReduce = useRingReduceGlobal;
   } else {
     matrixDist.reset(new MirrorGenerator(ctx.tile_size_host(),
                                          ctx.tile_size_host(), m, n, cRowStart,

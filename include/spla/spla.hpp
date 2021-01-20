@@ -41,4 +41,8 @@
 #include "spla/exceptions.hpp"
 #include "spla/types.h"
 
+namespace spla {
+SPLA_EXPORT extern bool useRingReduceGlobal;
+}
+
 #endif

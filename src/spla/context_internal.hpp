@@ -59,7 +59,7 @@ public:
       : pu_(pu),
         numThreads_(omp_get_max_threads()),
         numTiles_(4),
-        tileSizeHost_(1024),
+        tileSizeHost_(512),
         tileSizeGPU_(1024),
         opThresholdGPU_(2000000),
         gpuDeviceId_(0) {

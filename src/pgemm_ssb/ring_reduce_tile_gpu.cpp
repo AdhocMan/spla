@@ -159,7 +159,6 @@ auto RingReduceTileGPU<T>::prepare(IntType blockRowIdx, IntType blockColIdx,
   const IntType numBlocks = numBlockRows_ * numBlockCols_;
   const bool accumulateRequired = numBlocks != comm_.size();
   if (accumulateRequired) {
-  std::cout << "Accumulate required" << std::endl;
     std::memset(resultView_.data(), 0, resultView_.size() * sizeof(T));
     mpi_check_status(MPI_Win_fence(0, window_.get()));
   }

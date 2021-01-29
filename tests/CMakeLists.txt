@@ -69,6 +69,11 @@ target_link_libraries(benchmark PUBLIC spla ${SPLA_EXTERNAL_LIBS})
 target_include_directories(benchmark PUBLIC ${SPLA_INCLUDE_DIRS} ${SPLA_EXTERNAL_INCLUDE_DIRS} ${SPLA_TEST_INCLUDE_DIRS})
 target_compile_options(benchmark PRIVATE ${SPLA_DEFINITIONS} ${SPLA_EXTERNAL_COMPILE_OPTIONS})
 
+add_executable(benchmark_blocksize programs/benchmark_blocksize.cpp)
+target_link_libraries(benchmark_blocksize PUBLIC spla ${SPLA_EXTERNAL_LIBS})
+target_include_directories(benchmark_blocksize PUBLIC ${SPLA_INCLUDE_DIRS} ${SPLA_EXTERNAL_INCLUDE_DIRS} ${SPLA_TEST_INCLUDE_DIRS})
+target_compile_options(benchmark PRIVATE ${SPLA_DEFINITIONS} ${SPLA_EXTERNAL_COMPILE_OPTIONS})
+
 add_executable(benchmark_scalapack programs/benchmark_scalapack.cpp)
 target_link_libraries(benchmark_scalapack PUBLIC spla ${SPLA_EXTERNAL_LIBS} ${SPLA_TEST_LIBRARIES})
 target_include_directories(benchmark_scalapack PUBLIC ${SPLA_INCLUDE_DIRS} ${SPLA_EXTERNAL_INCLUDE_DIRS} ${SPLA_TEST_INCLUDE_DIRS})

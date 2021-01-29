@@ -154,14 +154,14 @@ int main(int argc, char** argv) {
                                                          repeats);
           else
             run_pgemm_ssb<std::complex<double>, spla::PinnedAllocator>(
-                ctx, m, n, k, blacsBlockSize, repeats);
+                ctx, k, blacsBlockSize, repeats);
         } else if (procName == "gpu-gpu") {
           if (typeName == "scalar")
             run_pgemm_ssb<double, spla::GPUAllocator>(ctx, k, blacsBlockSize,
                                                       repeats);
           else
             run_pgemm_ssb<std::complex<double>, spla::GPUAllocator>(
-                ctx, m, n, k, blacsBlockSize, repeats);
+                ctx, k, blacsBlockSize, repeats);
         }
 #else
         else {

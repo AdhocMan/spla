@@ -130,41 +130,56 @@ void pgemm_ssb_gpu(int m, int n, int kLocal, SplaOperation opA, T alpha, const T
 
 
   const IntType tileSizeGEMM = ctx.tile_size_gpu() * ctx.tile_size_gpu();
-  const IntType numTiles = ctx.num_tiles();
 
-  auto &gpuBuffers = ctx.gpu_buffers(numTiles * 3);
-  auto &blasHandles = ctx.gpu_blas_handles(numTiles);
 
   if (useRingReduce) {
-    auto &pinnedBuffers = ctx.pinned_buffers(2 * numTiles);
+    const IntType numTiles = 2;
+    const IntType numRingBlocks =  3;
+
+    auto pinnedBuffersIt = ctx.pinned_buffers(numTiles * (numRingBlocks + 1)).begin();
+    auto blasHandlesIt = ctx.gpu_blas_handles(numTiles * numRingBlocks).begin();
+    auto gpuBuffersIt = ctx.gpu_buffers(numTiles * numRingBlocks * 3).begin();
+    auto commsIt = descC.get_comms(numTiles).begin();
+
+
     std::vector<RingReduceTileGPU<T>> tiles;
     tiles.reserve(numTiles);
-    auto &comms = descC.get_comms(numTiles);
+
+    auto hostMatC = gpuPtrC ? HostArrayView2D<T>()
+                            : HostArrayView2D<T>(C, n + cColStart, ldc, ldc);
+
+    auto gpuMatC = gpuPtrC ? GPUArrayView2D<T>(gpuPtrC, n + cColStart, ldc, ldc)
+                           : GPUArrayView2D<T>();
 
     for (IntType i = 0; i < numTiles; ++i) {
-      auto matA = gpuPtrA ? GPUMatrixAccessor<GPUArrayConstView2D<T>>(
-                                GPUArrayConstView2D<T>(gpuPtrA, m, kLocal, lda))
-                          : GPUMatrixAccessor<GPUArrayConstView2D<T>>(
-                                HostArrayConstView2D<T>(A, m, kLocal, lda),
-                                tileSizeGEMM, gpuBuffers[i * 3]);
+      std::vector<RingBlock<T>> ringBlocks;
+      ringBlocks.reserve(numTiles * numRingBlocks);
+      for(IntType j = 0; j < numRingBlocks; ++j) {
+        auto matA = gpuPtrA
+                        ? GPUMatrixAccessor<GPUArrayConstView2D<T>>(
+                              GPUArrayConstView2D<T>(gpuPtrA, m, kLocal, lda))
+                        : GPUMatrixAccessor<GPUArrayConstView2D<T>>(
+                              HostArrayConstView2D<T>(A, m, kLocal, lda),
+                              tileSizeGEMM, *(gpuBuffersIt++));
 
-      auto matB = gpuPtrB ? GPUMatrixAccessor<GPUArrayConstView2D<T>>(
-                                GPUArrayConstView2D<T>(gpuPtrB, n, kLocal, ldb))
-                          : GPUMatrixAccessor<GPUArrayConstView2D<T>>(
-                                HostArrayConstView2D<T>(B, n, kLocal, ldb),
-                                tileSizeGEMM, gpuBuffers[i * 3 + 1]);
+        auto matB =
+            gpuPtrB ? GPUMatrixAccessor<GPUArrayConstView2D<T>>(
+                          GPUArrayConstView2D<T>(gpuPtrB, n, kLocal, ldb))
+                    : GPUMatrixAccessor<GPUArrayConstView2D<T>>(
+                          HostArrayConstView2D<T>(B, n, kLocal, ldb),
+                          tileSizeGEMM, *(gpuBuffersIt++));
+        ringBlocks.emplace_back(matrixDist->max_cols_in_block() *
+                                    matrixDist->max_rows_in_block(),
+                                *(blasHandlesIt++),
+                                *(pinnedBuffersIt++),
+                                *(gpuBuffersIt++),
+                                std::move(matA), std::move(matB));
+      }
 
-      auto hostMatC = gpuPtrC ? HostArrayView2D<T>()
-                              : HostArrayView2D<T>(C, n + cColStart, ldc, ldc);
 
-      auto gpuMatC = gpuPtrC
-                         ? GPUArrayView2D<T>(gpuPtrC, n + cColStart, ldc, ldc)
-                         : GPUArrayView2D<T>();
-
-      tiles.emplace_back(comms[i], blasHandles[i], pinnedBuffers[2 * i],
-                         pinnedBuffers[2 * i + 1], gpuBuffers[i * 3 + 2],
-                         matrixDist, opA, alpha, matA, matB, beta, hostMatC,
-                         gpuMatC);
+      tiles.emplace_back(*(commsIt++), std::move(ringBlocks),
+                         *(pinnedBuffersIt++),
+                         matrixDist, opA, alpha, beta, hostMatC, gpuMatC);
     }
 
     std::vector<BlockInfo> blockInfos;
@@ -196,9 +211,9 @@ void pgemm_ssb_gpu(int m, int n, int kLocal, SplaOperation opA, T alpha, const T
             // Prepare processing when there are enough blocks to form ring
             if (blockInfos.size() == descC.comm().size()) {
               auto & t = tiles[tileIdx % numTiles];
+              assert(t.state() == TileState::Processed || t.state() == TileState::Empty);
               if(t.state() == TileState::Processed) t.finalize();
               t.prepare(blockInfos.begin(), blockInfos.end());
-              t.process_step(); // Do a first step to start work on GPU
               blockInfos.resize(0);
               ++tileIdx;
             }
@@ -249,7 +264,10 @@ void pgemm_ssb_gpu(int m, int n, int kLocal, SplaOperation opA, T alpha, const T
 
 
   } else {
+    const IntType numTiles = ctx.num_tiles();
+    auto &blasHandles = ctx.gpu_blas_handles(numTiles);
     auto &pinnedBuffers = ctx.pinned_buffers(numTiles);
+    auto &gpuBuffers = ctx.gpu_buffers(numTiles * 3);
     const IntType numBlockRows = matrixDist->num_block_rows();
     const IntType numBlockCols = matrixDist->num_block_cols();
 

@@ -33,8 +33,8 @@ void run_pgemm_ssb(spla::Context& ctx, int k, int blacsBlockSize, int numRepeats
   const int gridRows = std::sqrt(worldSize);
   const int gridCols = worldSize / gridRows;
 
-  const int m = gridRows * blacsBlockSize;
-  const int n = gridCols * blacsBlockSize;
+  const int m = gridRows * ctx.tile_size_host();
+  const int n = gridCols * ctx.tile_size_host();
 
   const int maxRowsPerRank = (k + worldSize - 1) / worldSize;
   const int localNumRows = std::min(k - worldRank * maxRowsPerRank, maxRowsPerRank);

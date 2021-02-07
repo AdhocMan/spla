@@ -132,10 +132,8 @@ int main(int argc, char** argv) {
   std::string outputFileName;
   std::string typeName;
   std::string funcName;
-  bool useRingReduce = false;
 
   CLI::App app{"spla benchmark"};
-  app.add_flag("--ring", useRingReduce, "Use ring reduce");
   app.add_option("-r", repeats, "Number of repeats")->default_val("100");
   app.add_option("-l", lengthTarget, "Length target")->default_val("1024");
   app.add_option("-n", n, "Number of columns in C")->required();
@@ -154,8 +152,6 @@ int main(int argc, char** argv) {
   } catch (const CLI::ParseError& e) {
     return app.exit(e);
   }
-
-  spla::useRingReduceGlobal = useRingReduce;
 
   SplaProcessingUnit pu = procName == "cpu" ? SplaProcessingUnit::SPLA_PU_HOST : SplaProcessingUnit::SPLA_PU_GPU;
   spla::Context ctx(pu);

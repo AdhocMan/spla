@@ -136,39 +136,35 @@ int main(int argc, char** argv) {
     SCOPED_TIMING("k=" + std::to_string(k));
     for (const auto &blacsBlockSize : blockSizes) {
       SCOPED_TIMING("b=" + std::to_string(blacsBlockSize));
-      for (auto useRingReduce : {false, true}) {
-        SCOPED_TIMING(useRingReduce ? "ring" : "allreduce");
-        spla::useRingReduceGlobal = useRingReduce;
-        if (procName == "cpu") {
-          if (typeName == "scalar")
-            run_pgemm_ssb<double, spla::MPIAllocator>(ctx, k, blacsBlockSize,
-                                                      repeats);
-          else
-            run_pgemm_ssb<std::complex<double>, spla::MPIAllocator>(
-                ctx, k, blacsBlockSize, repeats);
-        }
-#if defined(SPLA_CUDA) || defined(SPLA_ROCM)
-        else if (procName == "gpu") {
-          if (typeName == "scalar")
-            run_pgemm_ssb<double, spla::PinnedAllocator>(ctx, k, blacsBlockSize,
-                                                         repeats);
-          else
-            run_pgemm_ssb<std::complex<double>, spla::PinnedAllocator>(
-                ctx, k, blacsBlockSize, repeats);
-        } else if (procName == "gpu-gpu") {
-          if (typeName == "scalar")
-            run_pgemm_ssb<double, spla::GPUAllocator>(ctx, k, blacsBlockSize,
-                                                      repeats);
-          else
-            run_pgemm_ssb<std::complex<double>, spla::GPUAllocator>(
-                ctx, k, blacsBlockSize, repeats);
-        }
-#else
-        else {
-          throw spla::GPUSupportError();
-        }
-#endif
+      if (procName == "cpu") {
+        if (typeName == "scalar")
+          run_pgemm_ssb<double, spla::MPIAllocator>(ctx, k, blacsBlockSize,
+                                                    repeats);
+        else
+          run_pgemm_ssb<std::complex<double>, spla::MPIAllocator>(
+              ctx, k, blacsBlockSize, repeats);
       }
+#if defined(SPLA_CUDA) || defined(SPLA_ROCM)
+      else if (procName == "gpu") {
+        if (typeName == "scalar")
+          run_pgemm_ssb<double, spla::PinnedAllocator>(ctx, k, blacsBlockSize,
+                                                       repeats);
+        else
+          run_pgemm_ssb<std::complex<double>, spla::PinnedAllocator>(
+              ctx, k, blacsBlockSize, repeats);
+      } else if (procName == "gpu-gpu") {
+        if (typeName == "scalar")
+          run_pgemm_ssb<double, spla::GPUAllocator>(ctx, k, blacsBlockSize,
+                                                    repeats);
+        else
+          run_pgemm_ssb<std::complex<double>, spla::GPUAllocator>(
+              ctx, k, blacsBlockSize, repeats);
+      }
+#else
+      else {
+        throw spla::GPUSupportError();
+      }
+#endif
     }
   }
 

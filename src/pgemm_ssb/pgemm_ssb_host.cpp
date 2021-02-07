@@ -71,8 +71,8 @@ void pgemm_ssb_host_ring(int m, int n, int kLocal, SplaOperation opA, T alpha,
   auto &buffers = ctx.mpi_buffers(2 * numTiles);
   auto &comms = descC.get_comms(numTiles);
 
-  const IntType rowsInBlock = gen.max_rows_in_block();
-  const IntType colsInBlock = gen.max_cols_in_block();
+  const IntType rowsInBlock = ctx.tile_size_host();
+  const IntType colsInBlock = ctx.tile_size_host();
 
   std::array<RingReduceTileHost<T, BLOCK_GEN>, numTiles> tiles{
       RingReduceTileHost<T, BLOCK_GEN>{

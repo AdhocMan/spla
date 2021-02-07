@@ -118,8 +118,8 @@ void pgemm_ssb_gpu_internal(int m, int n, int kLocal, SplaOperation opA,
   auto gpuMatC = gpuPtrC ? GPUArrayView2D<T>(gpuPtrC, n + cColStart, ldc, ldc)
                          : GPUArrayView2D<T>();
 
-  const IntType rowsInBlock = gen.max_rows_in_block();
-  const IntType colsInBlock = gen.max_cols_in_block();
+  const IntType rowsInBlock = ctx.tile_size_host();
+  const IntType colsInBlock = ctx.tile_size_host();
 
   for (IntType i = 0; i < numTiles; ++i) {
     std::vector<RingProcessor<T>> ringBlocks;

@@ -25,7 +25,7 @@
 #endif
 
 template <typename T, typename ALLOCATOR>
-void run_pgemm_ssb(spla::Context &ctx, int m, int n, int k, int blacsBlockSize,
+void run_pgemm_ssb(spla::Context &ctx, int m, int n, int k, int blockSize,
                    int numRepeats) {
   int worldRank, worldSize;
   MPI_Comm_rank(MPI_COMM_WORLD, &worldRank);
@@ -36,8 +36,8 @@ void run_pgemm_ssb(spla::Context &ctx, int m, int n, int k, int blacsBlockSize,
 
   const int maxRowsPerRank = (k + worldSize - 1) / worldSize;
   const int localNumRows = std::min(k - worldRank * maxRowsPerRank, maxRowsPerRank);
-  const int maxRowsC = (m / (blacsBlockSize * gridRows) + 1) * blacsBlockSize;
-  const int maxColsC = (n / (blacsBlockSize * gridCols) + 1) * blacsBlockSize;
+  const int maxRowsC = (m / (blockSize * gridRows) + 1) * blockSize;
+  const int maxColsC = (n / (blockSize * gridCols) + 1) * blockSize;
 
   spla::Buffer<ALLOCATOR> A;
   spla::Buffer<ALLOCATOR> B;
@@ -52,7 +52,7 @@ void run_pgemm_ssb(spla::Context &ctx, int m, int n, int k, int blacsBlockSize,
   rt_graph::Timer timer;
 
   auto arrayDesc = spla::MatrixDistribution::create_blacs_block_cyclic(
-      MPI_COMM_WORLD, 'R', gridRows, gridCols, blacsBlockSize, blacsBlockSize);
+      MPI_COMM_WORLD, 'R', gridRows, gridCols, blockSize, blockSize);
 
   // run once to warm up
   START_TIMING("warmup");
@@ -150,17 +150,17 @@ int main(int argc, char** argv) {
       else if (procName == "gpu") {
         if (typeName == "scalar")
           run_pgemm_ssb<double, spla::PinnedAllocator>(ctx, m, n, k,
-                                                       blacsBlockSize, repeats);
+                                                       blockSize, repeats);
         else
           run_pgemm_ssb<std::complex<double>, spla::PinnedAllocator>(
-              ctx, k, blacsBlockSize, repeats);
+              ctx, k, blockSize, repeats);
       } else if (procName == "gpu-gpu") {
         if (typeName == "scalar")
           run_pgemm_ssb<double, spla::GPUAllocator>(ctx, m, n, k,
-                                                    blacsBlockSize, repeats);
+                                                    blockSize, repeats);
         else
           run_pgemm_ssb<std::complex<double>, spla::GPUAllocator>(
-              ctx, m, n, k, blacsBlockSize, repeats);
+              ctx, m, n, k, blockSize, repeats);
       }
 #else
       else {

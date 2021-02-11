@@ -5,6 +5,7 @@
 #include <complex>
 #include <iomanip>
 #include <iostream>
+#include <fstream>
 #include <sstream>
 #include <vector>
 #include <string>
@@ -198,11 +199,14 @@ void run_gemm(spla::Context ctx, int globalRows, int colsA, const std::vector<in
   Cblacs_gridexit(grid);
   Cfree_blacs_system_handle(blacsCtx);
 
-  if (worldRank == 0) std::cout << spla::timing::GlobalTimer.process().print() << std::endl;
 }
 
 int main(int argc, char** argv) {
   spla::MPIInitHandle initHandle(argc, argv, true);
+
+  int worldRank, worldSize;
+  MPI_Comm_rank(MPI_COMM_WORLD, &worldRank);
+  MPI_Comm_size(MPI_COMM_WORLD, &worldSize);
 
   int repeats = 100;
   int colsA = 5;
@@ -212,9 +216,11 @@ int main(int argc, char** argv) {
   int blacsBlockSize = 256;
   std::string procName;
   std::string typeName;
+  std::string outputFileName;
   int lengthTarget = 256;
 
   CLI::App app{"spla benchmark"};
+  app.add_option("-o", outputFileName, "Output file name")->default_val("timers.json");
   app.add_option("-r", repeats, "Number of repeats")->default_val("100");
   app.add_option("-n", colsBValues, "Number of columns in C")->required();
   app.add_option("-m", colsA, "Number of rows in C")->required();
@@ -258,5 +264,11 @@ int main(int argc, char** argv) {
                                                          numThreads, blacsBlockSize, repeats);
   }
 
+  if (worldRank == 0) {
+    auto result = spla::timing::GlobalTimer.process();
+    std::cout << result.print() << std::endl;
+    std::ofstream file(outputFileName);
+    file << result.json();
+  }
   return 0;
 }

@@ -134,7 +134,7 @@ void run_gemm(spla::Context ctx, int globalRows, int colsA, const std::vector<in
   // Only run from GPU memory if less than 10GB required to store matrices
   if (ctx.processing_unit() == SPLA_PU_GPU &&
       A.template size<char>() * A.template size<char>() * A.template size<char>() <
-          10000 * 1024 * 1024) {
+          std::size_t(10000) * std::size_t(1024) * std::size_t(1024)) {
     spla::Buffer<spla::GPUAllocator> deviceA;
     spla::Buffer<spla::GPUAllocator> deviceB;
     spla::Buffer<spla::GPUAllocator> deviceC;

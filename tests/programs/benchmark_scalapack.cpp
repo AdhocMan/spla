@@ -132,34 +132,36 @@ void run_gemm(spla::Context ctx, int globalRows, int colsA, const std::vector<in
   STOP_TIMING("spla - host memory");
 
 #if defined(SPLA_CUDA) || defined(SPLA_ROCM)
-  // Only run from GPU memory if less than 10GB required to store matrices
-  if (ctx.processing_unit() == SPLA_PU_GPU &&
-      A.template size<char>() * A.template size<char>() * A.template size<char>() <
-          std::size_t(10000) * std::size_t(1024) * std::size_t(1024)) {
-    spla::Buffer<spla::GPUAllocator> deviceA;
-    spla::Buffer<spla::GPUAllocator> deviceB;
-    spla::Buffer<spla::GPUAllocator> deviceC;
-    deviceA.template resize<T>(maxRowsPerRank * colsA);
-    deviceB.template resize<T>(maxRowsPerRank * maxColsB);
-    deviceC.template resize<T>(maxRowsC * maxColsB);
+  if (ctx.processing_unit() == SPLA_PU_GPU) {
+    try {
+      spla::Buffer<spla::GPUAllocator> deviceA;
+      spla::Buffer<spla::GPUAllocator> deviceB;
+      spla::Buffer<spla::GPUAllocator> deviceC;
+      deviceA.template resize<T>(maxRowsPerRank * colsA);
+      deviceB.template resize<T>(maxRowsPerRank * maxColsB);
+      deviceC.template resize<T>(maxRowsC * maxColsB);
 
-    // run once to warm up
-    spla::pgemm_ssb(colsA, maxColsB, localNumRows, SPLA_OP_CONJ_TRANSPOSE, 1.0,
-                    deviceA.template data<T>(), localNumRows, deviceB.template data<T>(),
-                    localNumRows, 0.0, deviceC.template data<T>(), maxRowsC, 0, 0, arrayDesc, ctx);
+      // run once to warm up
+      spla::pgemm_ssb(colsA, maxColsB, localNumRows, SPLA_OP_CONJ_TRANSPOSE, 1.0,
+                      deviceA.template data<T>(), localNumRows, deviceB.template data<T>(),
+                      localNumRows, 0.0, deviceC.template data<T>(), maxRowsC, 0, 0, arrayDesc,
+                      ctx);
 
-    START_TIMING("spla - device memory");
-    for (int r = 0; r < numRepeats; ++r) {
-      SCOPED_TIMING("group");
-      for (const auto& colsB : colsBValues) {
-        SCOPED_TIMING("n=" + std::to_string(colsB));
-        spla::pgemm_ssb(colsA, colsB, localNumRows, SPLA_OP_CONJ_TRANSPOSE, 1.0,
-                        deviceA.template data<T>(), localNumRows, deviceB.template data<T>(),
-                        localNumRows, 0.0, deviceC.template data<T>(), maxRowsC, 0, 0, arrayDesc,
-                        ctx);
+      START_TIMING("spla - device memory");
+      for (int r = 0; r < numRepeats; ++r) {
+        SCOPED_TIMING("group");
+        for (const auto& colsB : colsBValues) {
+          SCOPED_TIMING("n=" + std::to_string(colsB));
+          spla::pgemm_ssb(colsA, colsB, localNumRows, SPLA_OP_CONJ_TRANSPOSE, 1.0,
+                          deviceA.template data<T>(), localNumRows, deviceB.template data<T>(),
+                          localNumRows, 0.0, deviceC.template data<T>(), maxRowsC, 0, 0, arrayDesc,
+                          ctx);
+        }
       }
+      STOP_TIMING("spla - device memory");
+    } catch (...) {
+      std::cout << "Error while running from device memory!" << std::endl;
     }
-    STOP_TIMING("spla - device memory");
   }
 
 #endif

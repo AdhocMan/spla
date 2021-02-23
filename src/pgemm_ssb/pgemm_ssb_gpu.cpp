@@ -45,7 +45,7 @@
 #include "memory/host_array_const_view.hpp"
 #include "memory/host_array_view.hpp"
 #include "pgemm_ssb/block_size_selection_ssb.hpp"
-#include "pgemm_ssb/ring_reduce_tile_gpu.hpp"
+#include "pgemm_ssb/ring_gpu.hpp"
 #include "spla/context.hpp"
 #include "spla/context_internal.hpp"
 #include "spla/matrix_distribution_internal.hpp"
@@ -103,16 +103,15 @@ void pgemm_ssb_gpu_internal(int m, int n, int kLocal, SplaOperation opA, T alpha
   IntType rowsInBlock = 1;
   IntType colsInBlock = 1;
 
+  const double ringThreshold = 0.65;
   const IntType minBlockSize =
       gpuPtrA && gpuPtrB
           ? 250
           : 500;  // If input is on host, smal block sizes lead to much more memory transfers
                   // required. Therefore use larger block sizes in that case.
-  const double deviationFactor = 0.3;  // How much to deviate from target block
-                                       // size to match distribution block size
-  std::tie(rowsInBlock, colsInBlock) = block_size_selection_ssb(
-      IsDisjointGenerator<BLOCK_GEN>::value, descC.comm().size(), m, n, gen.max_rows_in_block(),
-      gen.max_cols_in_block(), ctx.tile_size_host(), deviationFactor, minBlockSize);
+  std::tie(rowsInBlock, colsInBlock) =
+      block_size_selection_ssb(IsDisjointGenerator<BLOCK_GEN>::value, 1.0 - ringThreshold,
+                               descC.comm().size(), m, n, ctx.tile_size_host(), minBlockSize);
 
   // Compute maximum block sizes such that memory allocations for increasing m / n can be avoided
   const IntType maxBlockSize =
@@ -133,7 +132,7 @@ void pgemm_ssb_gpu_internal(int m, int n, int kLocal, SplaOperation opA, T alpha
   auto streamHandlesIt = ctx.gpu_stream_handles(numTiles * numRingProcs).begin();
   auto commsIt = descC.get_comms(numTiles).begin();
 
-  std::vector<RingReduceTileGPU<T, BLOCK_GEN>> tiles;
+  std::vector<RingGPU<T, BLOCK_GEN>> tiles;
   tiles.reserve(numTiles);
 
   auto hostMatC = gpuPtrC ? HostArrayView2D<T>() : HostArrayView2D<T>(C, n + cColStart, ldc, ldc);
@@ -156,12 +155,12 @@ void pgemm_ssb_gpu_internal(int m, int n, int kLocal, SplaOperation opA, T alpha
                           : GPUMatrixAccessor<GPUArrayConstView2D<T>>(
                                 HostArrayConstView2D<T>(B, n, kLocal, ldb), tileSizeGEMM,
                                 *(gpuBuffersIt++));
-      ringBlocks.emplace_back(rowsInBlock * colsInBlock, *(blasHandlesIt++), *(eventHandlesIt++),
+      ringBlocks.emplace_back(maxBlockSize, *(blasHandlesIt++), *(eventHandlesIt++),
                               *(streamHandlesIt++), *(pinnedBuffersIt++), *(gpuBuffersIt++),
                               std::move(matA), std::move(matB));
     }
 
-    tiles.emplace_back(maxBlockSize, *(commsIt++), std::move(ringBlocks),
+    tiles.emplace_back(ringThreshold, maxBlockSize, *(commsIt++), std::move(ringBlocks),
                        *(pinnedBuffersIt++), gen, opA, alpha, beta, hostMatC, gpuMatC);
   }
 

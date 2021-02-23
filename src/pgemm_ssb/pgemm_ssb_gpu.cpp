@@ -103,11 +103,11 @@ void pgemm_ssb_gpu_internal(int m, int n, int kLocal, SplaOperation opA, T alpha
   IntType rowsInBlock = 1;
   IntType colsInBlock = 1;
 
-  const double ringThreshold = 0.65;
+  const double ringThreshold = 0.00;
   const IntType minBlockSize =
       gpuPtrA && gpuPtrB
           ? 250
-          : 500;  // If input is on host, smal block sizes lead to much more memory transfers
+          : 1000;  // If input is on host, smal block sizes lead to much more memory transfers
                   // required. Therefore use larger block sizes in that case.
   std::tie(rowsInBlock, colsInBlock) =
       block_size_selection_ssb(IsDisjointGenerator<BLOCK_GEN>::value, 1.0 - ringThreshold,
@@ -117,7 +117,7 @@ void pgemm_ssb_gpu_internal(int m, int n, int kLocal, SplaOperation opA, T alpha
   const IntType maxBlockSize =
       std::max<IntType>(rowsInBlock * colsInBlock, ctx.tile_size_host() * ctx.tile_size_host());
 
-  const IntType numRingProcs = 2;  // Must be at least 2 for ring to work
+  const IntType numRingProcs = 3;  // Must be at least 2 for ring to work
   const IntType numTiles =
       std::max<IntType>(1, (ctx.num_tiles() + numRingProcs - 1) / numRingProcs);
 

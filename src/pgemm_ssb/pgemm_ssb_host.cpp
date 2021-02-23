@@ -63,8 +63,8 @@ void pgemm_ssb_host_ring(int m, int n, int kLocal, SplaOperation opA, T alpha, c
   IntType rowsInBlock = 1;
   IntType colsInBlock = 1;
 
-  const double ringThreshold = 0.65;
-  const IntType minBlockSize = 150;
+  const double ringThreshold = 0.00;
+  const IntType minBlockSize = 125;
   std::tie(rowsInBlock, colsInBlock) =
       block_size_selection_ssb(IsDisjointGenerator<BLOCK_GEN>::value, 1.0 - ringThreshold,
                                descC.comm().size(), m, n, ctx.tile_size_host(), minBlockSize);

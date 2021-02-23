@@ -25,33 +25,34 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-#ifndef SPLA_MATRIX_BLOCK_GENERATOR_HPP
-#define SPLA_MATRIX_BLOCK_GENERATOR_HPP
+#ifndef SPLA_BLOCK_HPP
+#define SPLA_BLOCK_HPP
 
 #include "spla/config.h"
 #include "util/common_types.hpp"
 
 namespace spla {
 
-template<typename T>
+template <typename T>
 struct IsDisjointGenerator {
   static constexpr bool value = false;
 };
 
 struct BlockInfo {
-  IntType globalRowIdx, globalColIdx; // Indices of first element in block in global matrix
-  IntType globalSubRowIdx, globalSubColIdx; // Indices of first element in block in global matrix without offset
-  IntType localRowIdx, localColIdx; // Indices of first element in block on assigned mpi rank
-  IntType numRows, numCols; // Size of block
-  IntType mpiRank; // negative value indicates mirrored on all ranks
+  IntType globalRowIdx, globalColIdx;  // Indices of first element in block in global matrix
+  IntType globalSubRowIdx,
+      globalSubColIdx;  // Indices of first element in block in global matrix without offset
+  IntType localRowIdx, localColIdx;  // Indices of first element in block on assigned mpi rank
+  IntType numRows, numCols;          // Size of block
+  IntType mpiRank;                   // negative value indicates mirrored on all ranks
 };
 
-struct BlockCoord {
+struct Block {
   IntType row;
   IntType col;
   IntType numRows;
   IntType numCols;
 };
 
-}
+}  // namespace spla
 #endif

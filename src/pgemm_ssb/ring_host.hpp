@@ -25,15 +25,16 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-#ifndef SPLA_RING_REDUCE_TILE_HOST_HPP
-#define SPLA_RING_REDUCE_TILE_HOST_HPP
+#ifndef SPLA_RING_HOST_HPP
+#define SPLA_RING_HOST_HPP
 
 #include <atomic>
 #include <memory>
-#include <vector>
 #include <utility>
+#include <vector>
+
+#include "block_generation/block.hpp"
 #include "memory/buffer.hpp"
-#include "block_generation/matrix_block_generator.hpp"
 #include "memory/host_array_const_view.hpp"
 #include "memory/host_array_view.hpp"
 #include "memory/mpi_allocator.hpp"
@@ -48,29 +49,32 @@
 
 namespace spla {
 
+// Compute and reduce for pgemm_ssb. If number of input blocks is equal to comm size, a ring
+// communication pattern is used. Otherwise, each block is processed individually.
 template <typename T, typename BLOCK_GEN>
-class RingReduceTileHost {
+class RingHost {
 public:
   using ValueType = T;
 
-  RingReduceTileHost(IntType maxBlockSize, IntType numThreads,
-                     MPICommunicatorHandle comm,
-                     std::shared_ptr<Buffer<MPIAllocator>> buffer,
-                     std::shared_ptr<Buffer<MPIAllocator>> resultBuffer,
-                     BLOCK_GEN baseMatGen, SplaOperation opA,
-                     ValueType alpha, const HostArrayConstView2D<ValueType> &A,
+  RingHost(double ringThreshold, IntType maxBlockSize, IntType numThreads,
+                     MPICommunicatorHandle comm, std::shared_ptr<Buffer<MPIAllocator>> buffer,
+                     std::shared_ptr<Buffer<MPIAllocator>> resultBuffer, BLOCK_GEN baseMatGen,
+                     SplaOperation opA, ValueType alpha, const HostArrayConstView2D<ValueType> &A,
                      const HostArrayConstView2D<ValueType> &B, ValueType beta,
                      HostArrayView2D<ValueType> C);
 
-  auto prepare(std::vector<BlockCoord>::const_iterator begin,
-               std::vector<BlockCoord>::const_iterator end) -> void;
+  // Prepare to process input blocks
+  auto prepare(std::vector<Block>::const_iterator begin,
+               std::vector<Block>::const_iterator end) -> void;
 
+  // Do one step within ring, prcosseing blocks. Returns true if more steps required, false
+  // otherwise.
   auto process_step() -> bool;
 
+  // Must be called after all processing steps are done and before preparing for more blocks.
   inline auto state() -> TileState { return state_; }
 
 private:
-
   auto process_step_ring() -> void;
 
   auto process_step_reduction() -> void;
@@ -84,10 +88,10 @@ private:
   IntType sendRank_ = 0;
   IntType recvRank_ = 0;
   IntType myStartIdx_ = 0;
-  IntType currentBlockIdx = 0;
+  IntType stepIdx_ = 0;
   MPIRequestHandle sendReq_;
   MPIRequestHandle recvReq_;
-  std::vector<BlockCoord> blocks_;
+  std::vector<Block> blocks_;
   std::vector<std::pair<IntType, BlockInfo>> myBlockInfos_;
   std::vector<MPIRequestHandle> resultRecvs_;
   TileState state_;
@@ -106,6 +110,7 @@ private:
   const SplaOperation opA_;
   const IntType numThreads_;
   const IntType maxBlockSize_;
+  const double ringThreshold_;
 };
 
 }  // namespace spla

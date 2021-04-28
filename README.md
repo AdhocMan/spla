@@ -38,7 +38,7 @@ For computation of triangular block distributed matrices, the `pgemm_ssbtr(...)`
 ### Stripe-Block-Stripe
 The `pgemm_sbs(...)` function computes
 
-![ethz](docs/images/sbs_formula.svg)
+<p align="center"><img src="docs/images/sbs_formula.svg" width="80%"></p>
 
 where matrices A and C are stored in a "stripe" distribution with variable block length. Matrix B can be in any supported block distribution, including the block-cyclic ScaLAPACK layout.
 

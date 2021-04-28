@@ -38,7 +38,7 @@ For computation of triangular block distributed matrices, the `pgemm_ssbtr(...)`
 ### Stripe-Block-Stripe
 The `pgemm_sbs(...)` function computes
 
-<p align="center"><img src="docs/images/sbs_formula.svg" width="80%"></p>
+![ethz](docs/images/sbs_formula.svg)
 
 where matrices A and C are stored in a "stripe" distribution with variable block length. Matrix B can be in any supported block distribution, including the block-cyclic ScaLAPACK layout.
 
@@ -80,7 +80,7 @@ make -j8 install
 | SPLA_FORTRAN          |  ON, OFF                                                 | OFF     | Build Fortan module                              |
 
 ## Performance
-![plot](./docs/images/spla_cosma_libsci.png)
+<p align="center"><img src="./docs/images/spla_cosma_libsci.png" width="80%"></p>
 
 
 ## Acknowledgements

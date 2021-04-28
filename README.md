@@ -79,6 +79,10 @@ make -j8 install
 | SPLA_INSTALL          |  ON, OFF                                                 | ON      | Add library to install target                    |
 | SPLA_FORTRAN          |  ON, OFF                                                 | OFF     | Build Fortan module                              |
 
+## Performance
+![plot](./docs/images/spla_cosma_libsci.png)
+
+
 ## Acknowledgements
 This work was supported by:
 

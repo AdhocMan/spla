@@ -80,7 +80,7 @@ make -j8 install
 | SPLA_FORTRAN          |  ON, OFF                                                 | OFF     | Build Fortan module                              |
 
 ## Performance
-<p align="center"><img src="./docs/images/spla_cosma_mkl.png" width="80%"></p>
+<p align="center"><img src="./docs/images/spla_cosma_mkl.png" width="50%"><img src="./docs/images/spla_cosma_libsci.png" width="50%"></p>
 <p align="center"><img src="./docs/images/spla_cosma_libsci.png" width="80%"></p>
 
 

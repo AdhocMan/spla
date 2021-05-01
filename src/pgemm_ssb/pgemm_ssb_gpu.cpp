@@ -123,8 +123,8 @@ void pgemm_ssb_gpu_internal(int m, int n, int kLocal, SplaOperation opA, T alpha
       std::max<IntType>(rowsInBlock * colsInBlock, ctx.tile_size_host() * ctx.tile_size_host());
 
   const IntType numRingProcs = 2;  // Must be at least 2 for ring to work
-  const IntType numTiles =
-      std::max<IntType>(1, (ctx.num_tiles() + numRingProcs - 1) / numRingProcs);
+  const IntType numTiles = 1;
+      // std::max<IntType>(1, (ctx.num_tiles() + numRingProcs - 1) / numRingProcs);
 
   /*************************************
    * Create tiles

@@ -32,6 +32,7 @@
 #if defined(SPLA_CUDA) || defined(SPLA_ROCM)
 #include <cassert>
 #include <memory>
+#include <iostream>
 
 #include "gpu_util/gpu_blas_api.hpp"
 #include "gpu_util/gpu_runtime_api.hpp"
@@ -152,6 +153,7 @@ public:
   GPUConstMatrixAccessor(const HostArrayConstView2D<ValueType> &matrix, IntType maxTileSize,
                          std::shared_ptr<Buffer<GPUAllocator>> buffer)
       : matrixHost_(matrix),
+        lastCopiedView_(new HostArrayConstView2D<T>()),
         rows_(matrix.dim_inner()),
         cols_(matrix.dim_outer()),
         maxTileSize_(maxTileSize),
@@ -168,7 +170,7 @@ public:
   auto size() const -> IntType { return rows_ * cols_; }
 
   auto get_tile(IntType rowOffset, IntType colOffset, IntType rows, IntType cols,
-                const gpu::StreamType &stream) const -> GPUArrayConstView2D<ValueType> {
+                const gpu::StreamType &stream) -> GPUArrayConstView2D<ValueType> {
     assert(rowOffset + rows <= rows_);
     assert(colOffset + cols <= cols_);
     assert(rows * cols <= maxTileSize_);
@@ -180,10 +182,10 @@ public:
       }
       assert(buffer_->size<ValueType>() >= cols * rows);
       GPUArrayView2D<ValueType> tile(buffer_->data<ValueType>(), cols, rows);
-      copy_to_gpu_async(stream,
-                        HostArrayConstView2D<ValueType>(&matrixHost_(colOffset, rowOffset), cols,
-                                                        rows, matrixHost_.ld_inner()),
-                        tile);
+      auto hostTile = HostArrayConstView2D<ValueType>(&matrixHost_(colOffset, rowOffset), cols,
+                                                      rows, matrixHost_.ld_inner());
+      if (!(hostTile == *lastCopiedView_)) copy_to_gpu_async(stream, hostTile, tile);
+      *lastCopiedView_ = hostTile;
       return tile;
     } else {
       return GPUArrayConstView2D<ValueType>(
@@ -201,7 +203,7 @@ public:
           HostArrayConstView2D<ValueType>(
               (matrixHost_.data() + matrixHost_.index(colOffset, rowOffset)), cols, rows,
               matrixHost_.ld_inner()),
-          maxTileSize_, buffer_);
+          maxTileSize_, buffer_, lastCopiedView_);
     } else {
       return GPUConstMatrixAccessor<ValueType>(
           GPUArrayConstView2D<ValueType>(matrixGPU_.data() + matrixGPU_.index(colOffset, rowOffset),
@@ -210,7 +212,20 @@ public:
   }
 
 private:
+  GPUConstMatrixAccessor(const HostArrayConstView2D<ValueType> &matrix, IntType maxTileSize,
+                         std::shared_ptr<Buffer<GPUAllocator>> buffer,
+                         std::shared_ptr<HostArrayConstView2D<T>> lastCopiedView)
+      : matrixHost_(matrix),
+        lastCopiedView_(std::move(lastCopiedView)),
+        rows_(matrix.dim_inner()),
+        cols_(matrix.dim_outer()),
+        maxTileSize_(maxTileSize),
+        buffer_(std::move(buffer)) {
+    assert(buffer_);
+  }
+
   HostArrayConstView2D<ValueType> matrixHost_;
+  std::shared_ptr<HostArrayConstView2D<ValueType>> lastCopiedView_;
   GPUArrayConstView2D<ValueType> matrixGPU_;
   IntType rows_, cols_;
   IntType maxTileSize_;

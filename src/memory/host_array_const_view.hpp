@@ -108,12 +108,21 @@ public:
 
   HostArrayConstView2D(const ValueType* data, const IntType dimOuter, const IntType dimInner);
 
+  auto operator=(const HostArrayConstView2D<T>& ) -> HostArrayConstView2D<T>& = default;
+
+  auto operator=(HostArrayConstView2D<T>&& ) -> HostArrayConstView2D<T>& = default;
+
   inline auto operator()(const IntType idxOuter, const IntType idxInner) const -> const ValueType& {
     assert(idxOuter < dims_[0]);
     assert(idxOuter >= 0);
     assert(idxInner < dims_[1]);
     assert(idxInner >= 0);
     return data_[(idxOuter * ldInner_) + idxInner];
+  }
+
+  inline auto operator==(const HostArrayConstView2D<T>& other) const -> bool {
+    return other.dims_[0] == dims_[0] && other.dims_[1] == dims_[1] && other.data_ == data_ &&
+           other.ldInner_ == ldInner_;
   }
 
   inline auto index(const IntType idxOuter, const IntType idxInner) const noexcept -> IntType {

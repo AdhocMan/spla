@@ -173,7 +173,7 @@ auto RingSBSGPU<T, BLOCK_GEN>::prepare(std::vector<Block>::const_iterator begin,
         MPI_Irecv(&startBlockView(info.globalColIdx - myStartBlock.col - bColOffset_,
                                   info.globalRowIdx - myStartBlock.row - bRowOffset_),
                   1, mpiVec.get(), info.mpiRank, collectTag, comm_.get(),
-                  collectRecvs_.back().get_and_activate());
+                  collectRecvs_.back().get());
       }
     }
   }
@@ -214,7 +214,7 @@ auto RingSBSGPU<T, BLOCK_GEN>::prepare(std::vector<Block>::const_iterator begin,
   START_TIMING("wait_recv")
   // Wait for all receives
   for (auto& r : collectRecvs_) {
-    r.wait_if_active();
+    r.wait();
   }
   STOP_TIMING("wait_recv")
 
@@ -241,8 +241,8 @@ auto RingSBSGPU<T, BLOCK_GEN>::process_step_ring(std::unordered_set<IntType>& be
   }
 
   START_TIMING("mpi_wait")
-  sendReq_.wait_if_active();
-  recvReq_.wait_if_active();
+  sendReq_.wait();
+  recvReq_.wait();
   STOP_TIMING("mpi_wait")
   std::swap(proc.sendView, proc.recvView);
 
@@ -255,7 +255,7 @@ auto RingSBSGPU<T, BLOCK_GEN>::process_step_ring(std::unordered_set<IntType>& be
     const auto& nextBlock = blocks_[nextBlockIdx];
     MPI_Irecv(nextProc.recvView.data(), nextBlock.numCols * nextBlock.numRows,
               MPIMatchElementaryType<T>::get(), recvRank_, ringTag, comm_.get(),
-              recvReq_.get_and_activate());
+              recvReq_.get());
   }
 
   if (blockIdx < numBlocks) {
@@ -271,7 +271,7 @@ auto RingSBSGPU<T, BLOCK_GEN>::process_step_ring(std::unordered_set<IntType>& be
       SCOPED_TIMING("isend")
       MPI_Isend(proc.sendView.data(), block.numRows * block.numCols,
                 MPIMatchElementaryType<T>::get(), sendRank_, ringTag, comm_.get(),
-                sendReq_.get_and_activate());
+                sendReq_.get());
     }
 
     if (proc.matA.size() != 0) {

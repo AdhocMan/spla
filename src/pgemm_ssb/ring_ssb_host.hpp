@@ -90,7 +90,8 @@ private:
   IntType myStartIdx_ = 0;
   IntType stepIdx_ = 0;
   MPIRequestHandle sendReq_;
-  MPIRequestHandle recvReq_;
+  PersistantMPIRequestHandle recvReq1_;
+  PersistantMPIRequestHandle recvReq2_;
   std::vector<Block> blocks_;
   std::vector<std::pair<IntType, BlockInfo>> myBlockInfos_;
   std::vector<MPIRequestHandle> resultRecvs_;

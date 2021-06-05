@@ -81,6 +81,11 @@ RingSSBHost<T, BLOCK_GEN>::RingSSBHost(double ringThreshold, IntType maxBlockSiz
 
   sendRank_ = comm_.rank() == 0 ? comm_.size() - 1 : comm_.rank() - 1;
   recvRank_ = (comm_.rank() + 1) % comm_.size();
+
+  recvReq1_.init_recv(recvView_.data(), maxBlockSize_, MPIMatchElementaryType<T>::get(), recvRank_,
+                      ringTag, comm_.get());
+  recvReq2_.init_recv(sendView_.data(), maxBlockSize_, MPIMatchElementaryType<T>::get(), recvRank_,
+                      ringTag, comm_.get());
 }
 
 template <typename T, typename BLOCK_GEN>
@@ -95,9 +100,10 @@ auto RingSSBHost<T, BLOCK_GEN>::prepare(std::vector<Block>::const_iterator begin
   stepIdx_ = 0;
   const IntType rankOffset = baseMatGen_.create_sub_generator(blocks_.front()).get_mpi_rank(0) + 1;
   myStartIdx_ = (rankOffset + comm_.rank()) % comm_.size();
-  useRing_ =
-      IsDisjointGenerator<BLOCK_GEN>::value &&
-      static_cast<double>(blocks_.size()) >= static_cast<double>(comm_.size()) * ringThreshold_;
+  // useRing_ =
+  //     IsDisjointGenerator<BLOCK_GEN>::value &&
+  //     static_cast<double>(blocks_.size()) >= static_cast<double>(comm_.size()) * ringThreshold_;
+  useRing_ = IsDisjointGenerator<BLOCK_GEN>::value;
 
   myBlockInfos_.resize(0);
   std::size_t requiredBufferSize = 0;
@@ -126,7 +132,7 @@ auto RingSSBHost<T, BLOCK_GEN>::prepare(std::vector<Block>::const_iterator begin
       const auto &pair = myBlockInfos_[i];
       MPI_Irecv(resultBuffer_->data<T>() + offset, pair.second.numCols * pair.second.numRows,
                 MPIMatchElementaryType<T>::get(), pair.first, resultTag, comm_.get(),
-                resultRecvs_[i].get_and_activate());
+                resultRecvs_[i].get());
       offset += pair.second.numCols * pair.second.numRows;
     }
   } else {
@@ -145,18 +151,20 @@ auto RingSSBHost<T, BLOCK_GEN>::process_step_ring() -> void {
   const IntType nextBlockIdx = (myStartIdx_ + stepIdx_ + 1) % comm_.size();
 
   START_TIMING("mpi_wait")
-  sendReq_.wait_if_active();
-  recvReq_.wait_if_active();
+  sendReq_.wait();
+  recvReq1_.wait();
+  recvReq2_.wait();
   STOP_TIMING("mpi_wait")
-  sendReq_.wait_if_active();
   std::swap(sendView_, recvView_);
+  std::swap(recvReq1_, recvReq2_);
 
   if (stepIdx_ < comm_.size() - 1 && nextBlockIdx < numBlocks) {
     SCOPED_TIMING("irecv")
     const auto &nextBlock = blocks_[nextBlockIdx];
-    MPI_Irecv(recvView_.data(), nextBlock.numCols * nextBlock.numRows,
-              MPIMatchElementaryType<T>::get(), recvRank_, ringTag, comm_.get(),
-              recvReq_.get_and_activate());
+    recvReq1_.start();
+    // MPI_Irecv(recvView_.data(), nextBlock.numCols * nextBlock.numRows,
+    //           MPIMatchElementaryType<T>::get(), recvRank_, ringTag, comm_.get(),
+    //           recvReq_.get());
   }
 
   if (blockIdx < blocks_.size()) {
@@ -170,7 +178,7 @@ auto RingSSBHost<T, BLOCK_GEN>::process_step_ring() -> void {
     if (stepIdx_ < comm_.size() - 1) {  // continue sending around in ring
       SCOPED_TIMING("send")
       MPI_Isend(sendView_.data(), block.numRows * block.numCols, MPIMatchElementaryType<T>::get(),
-                sendRank_, ringTag, comm_.get(), sendReq_.get_and_activate());
+                sendRank_, ringTag, comm_.get(), sendReq_.get());
     } else {  // send final result to target rank
       auto gen = baseMatGen_.create_sub_generator(block);
       for (IntType i = 0; i < gen.num_blocks(); ++i) {
@@ -192,7 +200,7 @@ auto RingSSBHost<T, BLOCK_GEN>::process_step_reduction() -> void {
   const auto &block = blocks_[stepIdx_];
 
   START_TIMING("mpi_wait")
-  sendReq_.wait_if_active();
+  sendReq_.wait();
   STOP_TIMING("mpi_wait")
 
   if (stepIdx_) {
@@ -225,7 +233,7 @@ auto RingSSBHost<T, BLOCK_GEN>::process_step_reduction() -> void {
   START_TIMING("iallreduce")
   mpi_check_status(MPI_Iallreduce(MPI_IN_PLACE, sendView_.data(), block.numCols * block.numRows,
                                   MPIMatchElementaryType<ValueType>::get(), MPI_SUM, comm_.get(),
-                                  sendReq_.get_and_activate()));
+                                  sendReq_.get()));
   STOP_TIMING("iallreduce")
 
   state_ = TileState::PartiallyProcessed;
@@ -235,8 +243,7 @@ template <typename T, typename BLOCK_GEN>
 auto RingSSBHost<T, BLOCK_GEN>::process_step_reduction_finalize() -> void {
   SCOPED_TIMING("reduction_finalize")
   // add tile to result as final step
-  sendReq_.wait_if_active();
-  recvReq_.wait_if_active();
+  sendReq_.wait();
 
   const auto &previousBlock = blocks_.back();
   auto gen = baseMatGen_.create_sub_generator(previousBlock);
@@ -261,13 +268,14 @@ template <typename T, typename BLOCK_GEN>
 auto RingSSBHost<T, BLOCK_GEN>::process_step_ring_finalize() -> void {
   SCOPED_TIMING("ring_finalize")
   // add tile to result as final step
-  sendReq_.wait_if_active();
-  recvReq_.wait_if_active();
+  sendReq_.wait();
+  recvReq1_.wait();
+  recvReq2_.wait();
 
   IntType offset = 0;
   SCOPED_TIMING("add_result")
   for (IntType i = 0; i < myBlockInfos_.size(); ++i) {
-    resultRecvs_[i].wait_if_active();
+    resultRecvs_[i].wait();
     const auto &info = myBlockInfos_[i].second;
 
     add_kernel(info.numRows, info.numCols, resultBuffer_->data<T>() + offset, info.numRows, beta_,

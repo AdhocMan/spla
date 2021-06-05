@@ -168,7 +168,7 @@ auto RingSSBGPU<T, BLOCK_GEN>::prepare(std::vector<Block>::const_iterator begin,
       const auto &pair = myBlockInfos_[i];
       MPI_Irecv(resultBufferHost_->data<T>() + offset, pair.second.numCols * pair.second.numRows,
                 MPIMatchElementaryType<T>::get(), pair.first, resultTag, comm_.get(),
-                resultRecvs_[i].get_and_activate());
+                resultRecvs_[i].get());
       offset += pair.second.numCols * pair.second.numRows;
     }
   }
@@ -234,7 +234,7 @@ auto RingSSBGPU<T, BLOCK_GEN>::process_step_ring() -> void {
       const auto &recvBlock = blocks_[recvBlockIdx];
       MPI_Irecv(nextProc.tileViewHost.data(), recvBlock.numCols * recvBlock.numRows,
                 MPIMatchElementaryType<T>::get(), recvRank_, ringTag, comm_.get(),
-                recvReq_.get_and_activate());
+                recvReq_.get());
     }
 
     if (sendBlockIdx < numBlocks) {
@@ -247,7 +247,7 @@ auto RingSSBGPU<T, BLOCK_GEN>::process_step_ring() -> void {
 
     if (recvBlockIdx < numBlocks) {
       START_TIMING("mpi_wait")
-      recvReq_.wait_if_active();
+      recvReq_.wait();
       STOP_TIMING("mpi_wait")
 
       const auto &recvBlock = blocks_[recvBlockIdx];
@@ -458,7 +458,7 @@ auto RingSSBGPU<T, BLOCK_GEN>::finalize() -> void {
         IntType offset = 0;
         for (IntType i = 0; i < myBlockInfos_.size(); ++i) {
           START_TIMING("mpi_wait")
-          resultRecvs_[i].wait_if_active();
+          resultRecvs_[i].wait();
           STOP_TIMING("mpi_wait")
           const auto &info = myBlockInfos_[i].second;
 
@@ -474,7 +474,7 @@ auto RingSSBGPU<T, BLOCK_GEN>::finalize() -> void {
         IntType offset = 0;
         for (IntType i = 0; i < myBlockInfos_.size(); ++i) {
           START_TIMING("mpi_wait")
-          resultRecvs_[i].wait_if_active();
+          resultRecvs_[i].wait();
           STOP_TIMING("mpi_wait")
           const auto &info = myBlockInfos_[i].second;
 

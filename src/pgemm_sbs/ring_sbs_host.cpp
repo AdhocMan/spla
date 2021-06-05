@@ -119,7 +119,7 @@ auto RingSBSHost<T, BLOCK_GEN>::prepare(std::vector<Block>::const_iterator begin
         MPI_Irecv(&startBlockView(info.globalColIdx - myStartBlock.col - bColOffset_,
                                   info.globalRowIdx - myStartBlock.row - bRowOffset_),
                   1, mpiVec.get(), info.mpiRank, collectTag, comm_.get(),
-                  collectRecvs_.back().get_and_activate());
+                  collectRecvs_.back().get());
       }
     }
   }
@@ -150,7 +150,7 @@ auto RingSBSHost<T, BLOCK_GEN>::prepare(std::vector<Block>::const_iterator begin
   START_TIMING("wait_recv")
   // Wait for all receives
   for (auto &r : collectRecvs_) {
-    r.wait_if_active();
+    r.wait();
   }
   STOP_TIMING("wait_recv")
 
@@ -167,8 +167,8 @@ auto RingSBSHost<T, BLOCK_GEN>::process_step_ring(std::unordered_set<IntType> &b
   const IntType nextBlockIdx = (myStartIdx_ + stepIdx_ + 1) % comm_.size();
 
   START_TIMING("mpi_wait")
-  sendReq_.wait_if_active();
-  recvReq_.wait_if_active();
+  sendReq_.wait();
+  recvReq_.wait();
   STOP_TIMING("mpi_wait")
   std::swap(sendView_, recvView_);
 
@@ -177,7 +177,7 @@ auto RingSBSHost<T, BLOCK_GEN>::process_step_ring(std::unordered_set<IntType> &b
     const auto &nextBlock = blocks_[nextBlockIdx];
     MPI_Irecv(recvView_.data(), nextBlock.numCols * nextBlock.numRows,
               MPIMatchElementaryType<T>::get(), recvRank_, ringTag, comm_.get(),
-              recvReq_.get_and_activate());
+              recvReq_.get());
   }
 
   if (blockIdx < numBlocks) {
@@ -185,7 +185,7 @@ auto RingSBSHost<T, BLOCK_GEN>::process_step_ring(std::unordered_set<IntType> &b
     if (stepIdx_ < comm_.size() - 1) {
       SCOPED_TIMING("isend")
       MPI_Isend(sendView_.data(), block.numRows * block.numCols, MPIMatchElementaryType<T>::get(),
-                sendRank_, ringTag, comm_.get(), sendReq_.get_and_activate());
+                sendRank_, ringTag, comm_.get(), sendReq_.get());
     }
 
     if (A_.dim_inner() != 0) {

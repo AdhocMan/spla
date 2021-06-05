@@ -45,38 +45,72 @@ public:
 
   MPIRequestHandle(const MPIRequestHandle&) = delete;
 
-  MPIRequestHandle(MPIRequestHandle&&) = default;
+  MPIRequestHandle(MPIRequestHandle&& handle) { *this = std::move(handle); }
 
-  auto operator=(const MPIRequestHandle& other) -> MPIRequestHandle& = delete;
+  auto operator=(const MPIRequestHandle&) -> MPIRequestHandle& = delete;
 
-  auto operator=(MPIRequestHandle&& other) -> MPIRequestHandle& = default;
-
-  inline auto get_and_activate() -> MPI_Request* {
-    activated_ = true;
-    return &mpiRequest_;
+  auto operator=(MPIRequestHandle&& handle) -> MPIRequestHandle& {
+    mpiRequest_ = handle.mpiRequest_;
+    handle.mpiRequest_ = MPI_REQUEST_NULL;
+    return *this;
   }
 
-  inline auto is_active() -> bool { return activated_; }
+  inline auto get() -> MPI_Request* { return &mpiRequest_; }
 
-  inline auto is_ready_and_active() -> bool {
-    if (activated_) {
-      int ready;
-      mpi_check_status(MPI_Test(&mpiRequest_, &ready, MPI_STATUS_IGNORE));
-      return static_cast<bool>(ready);
-    }
-    return false;
-  }
-
-  inline auto wait_if_active() -> void {
-    if (activated_) {
-      activated_ = false;
-      MPI_Wait(&mpiRequest_, MPI_STATUS_IGNORE);
-    }
-  }
+  inline auto wait() -> void { mpi_check_status(MPI_Wait(&mpiRequest_, MPI_STATUS_IGNORE)); }
 
 private:
   MPI_Request mpiRequest_ = MPI_REQUEST_NULL;
-  bool activated_ = false;
+};
+
+
+class PersistantMPIRequestHandle {
+public:
+  PersistantMPIRequestHandle() = default;
+
+  PersistantMPIRequestHandle(const MPIRequestHandle&) = delete;
+
+  PersistantMPIRequestHandle(PersistantMPIRequestHandle&& handle) {
+    *this = std::move(handle);
+  }
+
+  auto operator=(const PersistantMPIRequestHandle& other) -> PersistantMPIRequestHandle& = delete;
+
+  auto operator=(PersistantMPIRequestHandle&& handle) -> PersistantMPIRequestHandle& {
+    if (active_) MPI_Request_free(req_.get());
+    req_ = std::move(handle.req_);
+    active_ = handle.active_;
+    handle.active_ = false;
+    return *this;
+  }
+
+  ~PersistantMPIRequestHandle() {
+    if (active_) MPI_Request_free(req_.get());
+  }
+
+  inline auto init_send(const void* buf, int count, MPI_Datatype dataType, int dest, int tag,
+                        MPI_Comm comm) -> void {
+    if (active_) MPI_Request_free(req_.get());
+    mpi_check_status(MPI_Send_init(buf, count, dataType, dest, tag, comm, req_.get()));
+    active_ = true;
+  }
+
+  inline auto init_recv(void* buf, int count, MPI_Datatype dataType, int source, int tag,
+                        MPI_Comm comm) -> void {
+    if (active_) MPI_Request_free(req_.get());
+    mpi_check_status(MPI_Recv_init(buf, count, dataType, source, tag, comm, req_.get()));
+    active_ = true;
+  }
+
+  inline auto wait() -> void { req_.wait(); }
+
+  inline auto start() -> void {
+    if (active_) mpi_check_status(MPI_Start(req_.get()));
+  }
+
+private:
+  bool active_ = false;
+  MPIRequestHandle req_;
 };
 
 }  // namespace spla
